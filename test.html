@@ -1,0 +1,243 @@
+<html>
+
+<head>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+  }
+</style>
+</head>
+<body>
+<canvas style="z-index:-1" class="myCanvas"></canvas>
+<button  style="z-index:2; position:absolute; top:0; left:0" onclick="startSim()">Start Simulation</button>
+<button  style="z-index:2; position:absolute; top:0; right:0"  onclick="clearFrame(true)">Clear</button>
+<script>
+function degToRad(degrees) {
+  return degrees * Math.PI / 180;
+};
+//template
+const canvas = document.querySelector('.myCanvas');
+const width = canvas.width = window.innerWidth;
+const height = canvas.height = window.innerHeight;
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = 'rgb(0, 0, 0)';
+ctx.fillRect(0, 0, width, height);
+//end of template
+
+let curX;
+let curY;
+let colorGradientX = 0;
+let colorGradientMultiplier = 1;
+let prevCx, prevCy;
+let pressed = false;
+let dragging = true;
+let carrying = false;
+var points = []; //array of points
+var activePoint = 0;
+let cycleCompleted = false;
+
+document.addEventListener('keydown', function(event) {
+    if(event.keyCode == 46) {//delete tusu ile node silme
+        if(activePoint==0){
+          return;
+        }
+        points.splice(activePoint,1);
+        //sildikten sonra otomatik secmeyi kapatir
+        if(!dragging){
+            dragging = true;
+            points[activePoint].size = 5;
+            cycleCompleted=false;
+      }else{
+        		dragging = false;
+      }
+        clearFrame();
+        render();
+    }
+});
+
+document.onmousemove = function(e) {
+	//dragging = true;
+	if(!pressed){
+  curX = e.pageX;
+  curY = e.pageY;
+  }
+  if(points.length>0 && !dragging){
+  for(let i = 0; i < points.length; i++){
+  		if(points[i].size==10){
+      	carrying = true;
+      	activePoint = i;
+      	points[i].x = curX;
+        points[i].y = curY;
+        if(points[points.length-1].x < points[0].x + 10 && points[points.length-1].x + 10 > points[0].x &&
+        points[points.length-1].y < points[0].y + 10 && points[points.length-1].y + 10 > points[0].y){
+            points[points.length-1].connected = true;
+            points[points.length-1].x = points[0].x;
+            points[points.length-1].y = points[0].y;
+        }else{
+        		points[points.length-1].connected = false;
+        }
+    
+        clearFrame();
+        render();
+        break;
+      }
+  }
+  }
+  
+  
+}
+
+window.oncontextmenu = function ()//right click
+{
+    if(!dragging){
+    	dragging = true;
+      points[activePoint].size = 5;
+      cycleCompleted=false;
+      clearFrame();
+      render();
+    }else{
+    	dragging = false;
+    }
+    return false;     // cancel default menu
+}
+
+
+
+canvas.onmousedown = function() {
+  pressed = true;
+  //clear frame
+  clearFrame();
+        
+  if(!cycleCompleted ){
+    points.push({
+          x: curX,
+          y: curY,
+          size: 5,
+          fill: colorGradientX,
+          connected: false
+      });
+  }
+  
+    render();
+};
+
+canvas.onmouseup = function() {
+prevCx = curX;
+  prevCy = curY;
+  pressed = false;
+}
+
+function render(){
+		if(colorGradientX>230){
+    		colorGradientMultiplier = -1;
+    }else if(colorGradientX<25){
+    		colorGradientMultiplier = 1;
+    }
+    colorGradientX += 25 * colorGradientMultiplier;
+  for(let i = 1; i < points.length; i++){
+  	ctx.strokeStyle = 'rgb( 255, ' + points[i].fill + ', 0)';
+    ctx.beginPath();
+    ctx.moveTo(points[i].x, points[i].y);
+    ctx.lineTo(points[i-1].x,points[i-1].y);
+    ctx.stroke();
+    
+    if(points[i].x < points[0].x + 10 && points[i].x + 10 > points[0].x &&
+    points[i].y < points[0].y + 10 && points[i].y + 10 > points[0].y){
+        cycleCompleted = true;
+        points[points.length-1].x = points[0].x;
+        points[points.length-1].y = points[0].y;
+        break; //cycle completed
+    }
+  }
+  
+  for(let i = 1; i < points.length; i++){
+    ctx.fillStyle = 'rgb(255, 0, 0)';
+    ctx.beginPath();
+    
+    if(i!=points.length-1){//sonuncu node haric hepsi bagli kabul et
+    	points[i].connected = true;
+    }
+    
+    if(points[i].connected){//ucu acik kalani buyut
+    		ctx.arc(points[i].x, points[i].y, points[i].size, degToRad(0), degToRad(360), false);
+    }else{
+    		ctx.arc(points[i].x, points[i].y, 10, degToRad(0), degToRad(360), false);
+    }
+    
+    
+    
+    ctx.fill();
+  }
+  
+  ctx.fillStyle = 'rgb(0, 255, 0)';
+	ctx.fillRect(points[0].x-10, points[0].y-10, 20, 20);
+}
+
+function clearFrame(resetState = false){
+	ctx.fillStyle = 'rgb(0, 0, 0)';
+	ctx.fillRect(0, 0, width, height);
+  if(resetState){
+  	cycleCompleted = false;
+    points = [];
+    cancelAnimationFrame(startSimAnim);
+  }
+}
+
+function markEdge(){//make points bigger on hover
+      if(cycleCompleted && !dragging){
+      		for(let i = 0; i < points.length; i++){
+              if(points[i].x < curX + 10 && points[i].x + 10 > curX &&
+              points[i].y < curY + 10 && points[i].y + 10 > curY){
+                  points[i].size = 10;
+                  render();
+              }else{
+                if(points[i].size == 10){
+                    points[i].size = 5;
+                    clearFrame();
+                    render();
+                }
+              }
+
+            }
+      }
+      requestAnimationFrame(markEdge);
+}
+
+var startSimAnim;
+var simStarted = false;
+function startSim(){
+	simStarted = true;
+	for(let i = 0; i < points.length-1; i++){
+      /*
+      var colorGradSimX = 0
+      var colorGradientSimMultiplier = 1;
+      */
+			var maxTryX = 0;
+      
+      
+      var arctanx = Math.atan((points[i+1].y-points[i].y)/(points[i+1].x-points[i].x));
+      console.log("deg: " + arctanx*180/Math.PI);//rotate the tank
+
+     
+      /*
+  		for(let px = points[i].x; px < points[i+1].x;){
+      		ctx.fillStyle = 'rgb(0, 255, 0)';
+          ctx.beginPath();
+          ctx.arc( px, points[i].y, points[i].size, degToRad(0), degToRad(360), false);
+          ctx.fill();
+          px++;
+      }
+      */
+  		
+  }
+	//startSimAnim = requestAnimationFrame(startSim);
+}
+
+markEdge();
+
+
+</script>
+
+</body>
+</html>
